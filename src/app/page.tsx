@@ -1,11 +1,27 @@
 "use client";
-
+import { useSession, signOut } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { IProduct } from "@/models/Product";
 
 export default function Home() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
   const [products, setProducts] = useState<IProduct[]>([]);
+
+  useEffect(() => {
+    if (status === "loading") return;
+    if (!session) {
+      router.push("/authscreen/login");
+    }
+  }, [session, status, router]);
+
+  useEffect(() => {
+    if (session) {
+      fetchProducts();
+    }
+  }, [session]);
 
   const fetchProducts = async () => {
     const res = await fetch("/api/products", { cache: "no-store" });
@@ -22,18 +38,31 @@ export default function Home() {
     fetchProducts();
   }, []);
 
+  const handleLogout = () => {
+    signOut({ callbackUrl: "/authscreen/login" });
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-6 py-10">
       <div className="flex justify-between items-center mb-10">
         <h1 className="text-4xl font-bold text-gray-800">
           🛍️ Danh sách sản phẩm
         </h1>
-        <Link
-          href="/create"
-          className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg shadow transition"
-        >
-          + Thêm sản phẩm
-        </Link>
+
+        <div className="flex items-center gap-4">
+          <Link
+            href="/create"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg shadow transition"
+          >
+            + Thêm sản phẩm
+          </Link>
+          <button
+            onClick={handleLogout}
+            className="bg-gray-300 hover:bg-gray-400 text-black px-5 py-2.5 rounded-lg shadow transition"
+          >
+            🔓 Đăng xuất
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
