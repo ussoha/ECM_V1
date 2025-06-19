@@ -1,4 +1,5 @@
 "use client";
+
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -8,7 +9,20 @@ import { IProduct } from "@/models/Product";
 export default function Home() {
   const { data: session, status } = useSession();
   const router = useRouter();
+
   const [products, setProducts] = useState<IProduct[]>([]);
+  const [search, setSearch] = useState("");
+  const [minPrice, setMinPrice] = useState("");
+  const [maxPrice, setMaxPrice] = useState("");
+
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [limit] = useState(8);
+
+const applyFilter = () => {
+  setPage(1); // reset về trang đầu tiên
+  fetchProducts();
+};
 
   useEffect(() => {
     if (status === "loading") return;
@@ -24,8 +38,27 @@ export default function Home() {
   }, [session]);
 
   const fetchProducts = async () => {
-    const res = await fetch("/api/products", { cache: "no-store" });
-    setProducts(await res.json());
+    const query = new URLSearchParams({
+      search,
+      min: minPrice || "0",
+      max: maxPrice || "1000000000",
+      page: page.toString(),
+      limit: limit.toString(),
+    });
+
+    try {
+      const res = await fetch(`/api/products?${query.toString()}`, {
+        cache: "no-store",
+      });
+
+      if (!res.ok) throw new Error("Lỗi khi lấy dữ liệu");
+      const data = await res.json();
+      setProducts(data.products || []);
+      setTotal(data.total || 0);
+    } catch (err) {
+      console.error("Lỗi fetch:", err);
+      setProducts([]);
+    }
   };
 
   const deleteProduct = async (id: string) => {
@@ -33,10 +66,6 @@ export default function Home() {
     await fetch(`/api/products/${id}`, { method: "DELETE" });
     fetchProducts();
   };
-
-  useEffect(() => {
-    fetchProducts();
-  }, []);
 
   const handleLogout = () => {
     signOut({ callbackUrl: "/authscreen/login" });
@@ -46,7 +75,7 @@ export default function Home() {
     <div className="max-w-7xl mx-auto px-6 py-10">
       <div className="flex justify-between items-center mb-10">
         <h1 className="text-4xl font-bold text-gray-800">
-          🛍️ Danh sách sản phẩm
+          🏍️ Danh sách sản phẩm
         </h1>
 
         <div className="flex items-center gap-4">
@@ -65,8 +94,40 @@ export default function Home() {
         </div>
       </div>
 
+      {/* Filter section */}
+      <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+        <input
+          type="text"
+          placeholder="🔍 Tìm theo tên"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="border px-4 py-2 rounded-md w-full"
+        />
+        <input
+          type="number"
+          placeholder="💰 Giá từ"
+          value={minPrice}
+          onChange={(e) => setMinPrice(e.target.value)}
+          className="border px-4 py-2 rounded-md w-full"
+        />
+        <input
+          type="number"
+          placeholder="💸 Giá đến"
+          value={maxPrice}
+          onChange={(e) => setMaxPrice(e.target.value)}
+          className="border px-4 py-2 rounded-md w-full"
+        />
+        <button
+          onClick={applyFilter}
+          className="bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded-md"
+        >
+          ⚙️ Áp dụng lọc
+        </button>
+      </div>
+
+      {/* Product Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
-        {products.map((p) => (
+        {Array.isArray(products) && products.map((p) => (
           <div
             key={p._id.toString()}
             className="bg-white rounded-2xl shadow hover:shadow-xl transition overflow-hidden flex flex-col justify-between"
@@ -109,6 +170,31 @@ export default function Home() {
           </div>
         ))}
       </div>
+      <div className="mt-6 flex justify-center gap-2">
+  {total > limit && (
+  <div className="flex justify-center mt-8 gap-4">
+    <button
+      disabled={page === 1}
+      onClick={() => setPage(page - 1)}
+      className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300 disabled:opacity-50"
+    >
+      ◀ Trang trước
+    </button>
+
+    <span className="px-4 py-2 text-gray-700 font-medium">
+      Trang {page} / {Math.ceil(total / limit)}
+    </span>
+
+    <button
+      disabled={page >= Math.ceil(total / limit)}
+      onClick={() => setPage(page + 1)}
+      className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300 disabled:opacity-50"
+    >
+      Trang sau ▶
+    </button>
+  </div>
+)}
+</div>
     </div>
   );
 }

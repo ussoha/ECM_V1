@@ -11,15 +11,37 @@ export const config = {
   },
 };
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   await dbConnect();
+
+  const { searchParams } = new URL(req.url);
+
+  const page = parseInt(searchParams.get("page") || "1");
+  const limit = parseInt(searchParams.get("limit") || "8");
+  const keyword = searchParams.get("search") || "";
+  const min = parseInt(searchParams.get("min") || "0");
+  const max = parseInt(searchParams.get("max") || "1000000000");
+
+  const skip = (page - 1) * limit;
+
+  // Xây filter object
+  const query: any = {
+    name: { $regex: keyword, $options: "i" }, // search tên (không phân biệt hoa thường)
+    price: { $gte: min, $lte: max }, // khoảng giá
+  };
+
   try {
-    const products = await Product.find({});
-    return NextResponse.json(products);
+    const [products, total] = await Promise.all([
+      Product.find(query).skip(skip).limit(limit).sort({ createdAt: -1 }),
+      Product.countDocuments(query),
+    ]);
+
+    return NextResponse.json({ products, total });
   } catch (error) {
-    return NextResponse.json({ message: "Lỗi server", error }, { status: 500 });
+    return NextResponse.json({ message: "Server Error", error }, { status: 500 });
   }
 }
+
 
 export async function POST(req: NextRequest) {
   await dbConnect();
@@ -65,3 +87,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ message: "Lỗi server", error }, { status: 500 });
   }
 }
+
+
