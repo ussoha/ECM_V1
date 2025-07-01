@@ -39,4 +39,22 @@ export const authOptions: NextAuthOptions = {
     strategy: "jwt" as SessionStrategy,
   },
   secret: process.env.NEXTAUTH_SECRET,
+
+    callbacks: {
+    async jwt({ token, user }) {
+      // Khi login lần đầu, gắn id vào token
+      if (user) {
+        token.id = user.id;
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      // Gắn id từ token vào session.user
+      if (token && session.user) {
+        session.user.id = token.id as string;
+      }
+      return session;
+    }
+  }
+  
 };
